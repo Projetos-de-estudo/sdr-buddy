@@ -14,7 +14,258 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      campanhas: {
+        Row: {
+          created_at: string
+          descricao: string | null
+          id: string
+          mensagens_enviadas: number | null
+          nome: string
+          palavras_chave: string[]
+          respostas_recebidas: number | null
+          status: string | null
+          total_contatos: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          mensagens_enviadas?: number | null
+          nome: string
+          palavras_chave: string[]
+          respostas_recebidas?: number | null
+          status?: string | null
+          total_contatos?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          mensagens_enviadas?: number | null
+          nome?: string
+          palavras_chave?: string[]
+          respostas_recebidas?: number | null
+          status?: string | null
+          total_contatos?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      clientes: {
+        Row: {
+          created_at: string
+          id: number
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+        }
+        Update: {
+          created_at?: string
+          id?: number
+        }
+        Relationships: []
+      }
+      configuracoes_usuario: {
+        Row: {
+          configuracoes_extras: Json | null
+          created_at: string
+          email_ativo: boolean | null
+          google_sheets_id: string | null
+          id: string
+          intervalo_envio: number | null
+          updated_at: string
+          user_id: string
+          whatsapp_ativo: boolean | null
+        }
+        Insert: {
+          configuracoes_extras?: Json | null
+          created_at?: string
+          email_ativo?: boolean | null
+          google_sheets_id?: string | null
+          id?: string
+          intervalo_envio?: number | null
+          updated_at?: string
+          user_id: string
+          whatsapp_ativo?: boolean | null
+        }
+        Update: {
+          configuracoes_extras?: Json | null
+          created_at?: string
+          email_ativo?: boolean | null
+          google_sheets_id?: string | null
+          id?: string
+          intervalo_envio?: number | null
+          updated_at?: string
+          user_id?: string
+          whatsapp_ativo?: boolean | null
+        }
+        Relationships: []
+      }
+      contatos: {
+        Row: {
+          campanha_id: string | null
+          categoria: string | null
+          created_at: string
+          email: string | null
+          endereco: string | null
+          id: string
+          nome: string
+          notas: string | null
+          status: string | null
+          telefone: string | null
+          updated_at: string
+          user_id: string
+          website: string | null
+        }
+        Insert: {
+          campanha_id?: string | null
+          categoria?: string | null
+          created_at?: string
+          email?: string | null
+          endereco?: string | null
+          id?: string
+          nome: string
+          notas?: string | null
+          status?: string | null
+          telefone?: string | null
+          updated_at?: string
+          user_id: string
+          website?: string | null
+        }
+        Update: {
+          campanha_id?: string | null
+          categoria?: string | null
+          created_at?: string
+          email?: string | null
+          endereco?: string | null
+          id?: string
+          nome?: string
+          notas?: string | null
+          status?: string | null
+          telefone?: string | null
+          updated_at?: string
+          user_id?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contatos_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "campanhas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      logs_envio: {
+        Row: {
+          campanha_id: string | null
+          contato_id: string | null
+          created_at: string
+          enviado_em: string | null
+          erro: string | null
+          id: string
+          mensagem_enviada: string | null
+          status: string | null
+          template_id: string | null
+          tipo: string
+          user_id: string
+        }
+        Insert: {
+          campanha_id?: string | null
+          contato_id?: string | null
+          created_at?: string
+          enviado_em?: string | null
+          erro?: string | null
+          id?: string
+          mensagem_enviada?: string | null
+          status?: string | null
+          template_id?: string | null
+          tipo: string
+          user_id: string
+        }
+        Update: {
+          campanha_id?: string | null
+          contato_id?: string | null
+          created_at?: string
+          enviado_em?: string | null
+          erro?: string | null
+          id?: string
+          mensagem_enviada?: string | null
+          status?: string | null
+          template_id?: string | null
+          tipo?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logs_envio_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "campanhas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logs_envio_contato_id_fkey"
+            columns: ["contato_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logs_envio_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates_mensagem"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      templates_mensagem: {
+        Row: {
+          assunto: string | null
+          ativo: boolean | null
+          conteudo: string
+          created_at: string
+          id: string
+          nome: string
+          tipo: string | null
+          updated_at: string
+          user_id: string
+          variaveis: string[] | null
+        }
+        Insert: {
+          assunto?: string | null
+          ativo?: boolean | null
+          conteudo: string
+          created_at?: string
+          id?: string
+          nome: string
+          tipo?: string | null
+          updated_at?: string
+          user_id: string
+          variaveis?: string[] | null
+        }
+        Update: {
+          assunto?: string | null
+          ativo?: boolean | null
+          conteudo?: string
+          created_at?: string
+          id?: string
+          nome?: string
+          tipo?: string | null
+          updated_at?: string
+          user_id?: string
+          variaveis?: string[] | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
