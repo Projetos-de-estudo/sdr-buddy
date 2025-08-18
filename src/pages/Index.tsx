@@ -4,23 +4,33 @@ import { Dashboard } from "@/components/Dashboard/Dashboard";
 import { SearchContacts } from "@/components/Search/SearchContacts";
 import { ContactsList } from "@/components/Contacts/ContactsList";
 import { MessageTemplates } from "@/components/Templates/MessageTemplates";
+import { CampaignManager } from "@/components/Campaigns/CampaignManager";
+import { LoginForm } from "@/components/Auth/LoginForm";
+import { useAuth } from "@/components/Auth/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
   const [currentView, setCurrentView] = useState("dashboard");
+  const { user, loading } = useAuth();
   const { toast } = useToast();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginForm />;
+  }
 
   const handleViewChange = (view: string) => {
     setCurrentView(view);
-    
-    // Mostrar aviso sobre funcionalidades que precisam de backend
-    if (["campaigns", "analytics", "settings"].includes(view)) {
-      toast({
-        title: "Funcionalidade Backend",
-        description: "Esta funcionalidade requer integração com Supabase para APIs, banco de dados e automações. Conecte ao Supabase para ativar todos os recursos.",
-        duration: 4000
-      });
-    }
   };
 
   const renderContent = () => {
@@ -34,15 +44,15 @@ const Index = () => {
       case "templates":
         return <MessageTemplates />;
       case "campaigns":
+        return <CampaignManager />;
       case "analytics":
       case "settings":
         return (
           <div className="flex items-center justify-center h-96">
             <div className="text-center space-y-4">
-              <h2 className="text-2xl font-bold">Funcionalidade em Desenvolvimento</h2>
+              <h2 className="text-2xl font-bold">Em Breve</h2>
               <p className="text-muted-foreground max-w-md">
-                Esta funcionalidade requer integração com Supabase para automações, APIs e banco de dados. 
-                Conecte ao Supabase para ativar todos os recursos do agente SDR.
+                Funcionalidade em desenvolvimento.
               </p>
             </div>
           </div>

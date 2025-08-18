@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/Auth/AuthContext";
 import { 
   Home, 
   Search, 
@@ -10,7 +11,8 @@ import {
   Settings,
   BarChart3,
   Menu,
-  X
+  X,
+  LogOut
 } from "lucide-react";
 
 interface SidebarProps {
@@ -30,6 +32,7 @@ const menuItems = [
 
 export const Sidebar = ({ currentView, onViewChange }: SidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { signOut, user } = useAuth();
 
   return (
     <div className={cn(
@@ -72,6 +75,25 @@ export const Sidebar = ({ currentView, onViewChange }: SidebarProps) => {
             </Button>
           );
         })}
+        
+        <div className="absolute bottom-4 left-2 right-2">
+          {!isCollapsed && user && (
+            <div className="text-xs text-muted-foreground mb-2 px-2 truncate">
+              {user.email}
+            </div>
+          )}
+          <Button
+            variant="ghost"
+            className={cn(
+              "w-full justify-start gap-3 h-11 text-muted-foreground hover:text-foreground",
+              isCollapsed && "px-2 justify-center"
+            )}
+            onClick={signOut}
+          >
+            <LogOut size={18} />
+            {!isCollapsed && <span>Sair</span>}
+          </Button>
+        </div>
       </nav>
     </div>
   );
