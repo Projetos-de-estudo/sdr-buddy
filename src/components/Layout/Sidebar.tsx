@@ -7,12 +7,13 @@ import {
   Search, 
   Users, 
   MessageSquare, 
-  Play, 
-  Settings,
-  BarChart3,
+  Play,
+  Send,
+  BarChart3, 
+  Settings, 
+  LogOut,
   Menu,
-  X,
-  LogOut
+  X
 } from "lucide-react";
 
 interface SidebarProps {
@@ -26,6 +27,7 @@ const menuItems = [
   { id: "contacts", label: "Lista de Contatos", icon: Users },
   { id: "templates", label: "Templates", icon: MessageSquare },
   { id: "campaigns", label: "Campanhas", icon: Play },
+  { id: "messages", label: "Enviar Mensagens", icon: Send },
   { id: "analytics", label: "Relatórios", icon: BarChart3 },
   { id: "settings", label: "Configurações", icon: Settings },
 ];

@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/components/Auth/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Table,
   TableBody,
@@ -38,50 +41,52 @@ interface Contact {
 export const ContactsList = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const { toast } = useToast();
 
-  // Mock data
-  const contacts: Contact[] = [
-    {
-      id: "1",
-      name: "Restaurante Bella Vista",
-      address: "Rua Augusta, 1234 - São Paulo, SP",
-      phone: "(11) 98765-4321",
-      website: "www.bellavista.com.br",
-      email: "contato@bellavista.com.br",
-      category: "Restaurante",
-      status: "convertido",
-      dateAdded: "2024-01-15"
-    },
-    {
-      id: "2",
-      name: "Pizzaria Don Luigi",
-      address: "Av. Paulista, 567 - São Paulo, SP",
-      phone: "(11) 91234-5678",
-      website: "www.donluigi.com.br",
-      category: "Restaurante",
-      status: "respondeu",
-      dateAdded: "2024-01-14"
-    },
-    {
-      id: "3",
-      name: "Bistrô Central",
-      address: "Rua Oscar Freire, 890 - São Paulo, SP",
-      phone: "(11) 99876-5432",
-      email: "contato@bistrocentral.com.br",
-      category: "Restaurante",
-      status: "contatado",
-      dateAdded: "2024-01-13"
-    },
-    {
-      id: "4",
-      name: "Loja Fashion Style",
-      address: "Shopping Ibirapuera - São Paulo, SP",
-      phone: "(11) 94567-8901",
-      category: "Loja de Roupas",
-      status: "novo",
-      dateAdded: "2024-01-12"
+  const fetchContacts = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('contatos')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      // Mapear os dados do banco para o formato esperado
+      const mappedContacts = (data || []).map(contact => ({
+        id: contact.id,
+        name: contact.nome,
+        address: contact.endereco || '',
+        phone: contact.telefone,
+        website: contact.website,
+        email: contact.email,
+        category: contact.categoria || 'Sem categoria',
+        status: contact.status as "novo" | "contatado" | "respondeu" | "convertido",
+        dateAdded: contact.created_at.split('T')[0]
+      }));
+      
+      setContacts(mappedContacts);
+    } catch (error: any) {
+      console.error('Erro ao buscar contatos:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar contatos",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  useEffect(() => {
+    fetchContacts();
+  }, [user]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -122,7 +127,7 @@ export const ContactsList = () => {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Users className="w-5 h-5" />
-              Total: {filteredContacts.length} contatos
+              Total: {loading ? "..." : filteredContacts.length} contatos
             </CardTitle>
             <div className="flex gap-2">
               <div className="relative">
@@ -154,8 +159,21 @@ export const ContactsList = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredContacts.map((contact) => (
-                  <TableRow key={contact.id} className="hover:bg-muted/50">
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      Carregando contatos...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredContacts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      Nenhum contato encontrado. Faça uma busca primeiro.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredContacts.map((contact) => (
+                    <TableRow key={contact.id} className="hover:bg-muted/50">
                     <TableCell className="font-medium">
                       <div>
                         <div className="font-semibold">{contact.name}</div>
@@ -204,8 +222,9 @@ export const ContactsList = () => {
                         </Button>
                       </div>
                     </TableCell>
-                  </TableRow>
-                ))}
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>

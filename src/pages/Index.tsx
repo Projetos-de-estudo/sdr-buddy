@@ -5,6 +5,7 @@ import { SearchContacts } from "@/components/Search/SearchContacts";
 import { ContactsList } from "@/components/Contacts/ContactsList";
 import { MessageTemplates } from "@/components/Templates/MessageTemplates";
 import { CampaignManager } from "@/components/Campaigns/CampaignManager";
+import { SendMessages } from "@/components/Messages/SendMessages";
 import { LoginForm } from "@/components/Auth/LoginForm";
 import { useAuth } from "@/components/Auth/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -45,6 +46,8 @@ const Index = () => {
         return <MessageTemplates />;
       case "campaigns":
         return <CampaignManager />;
+      case "messages":
+        return <SendMessages />;
       case "analytics":
       case "settings":
         return (

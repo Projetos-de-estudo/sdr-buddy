@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/components/Auth/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Search, MapPin, Loader2, Download, Edit, Trash2 } from "lucide-react";
 
 interface Contact {
@@ -20,36 +22,27 @@ export const SearchContacts = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [selectedCampaign, setSelectedCampaign] = useState<string>("");
+  const [campaigns, setCampaigns] = useState<any[]>([]);
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  // Mock data para demonstração
-  const mockContacts: Contact[] = [
-    {
-      id: "1",
-      name: "Restaurante Bella Vista",
-      address: "Rua Augusta, 1234 - São Paulo, SP",
-      phone: "(11) 98765-4321",
-      website: "www.bellavista.com.br",
-      email: "contato@bellavista.com.br",
-      category: "Restaurante"
-    },
-    {
-      id: "2",
-      name: "Pizzaria Don Luigi",
-      address: "Av. Paulista, 567 - São Paulo, SP",
-      phone: "(11) 91234-5678",
-      website: "www.donluigi.com.br",
-      category: "Restaurante"
-    },
-    {
-      id: "3",
-      name: "Bistrô Central",
-      address: "Rua Oscar Freire, 890 - São Paulo, SP",
-      phone: "(11) 99876-5432",
-      email: "contato@bistrocentral.com.br",
-      category: "Restaurante"
-    }
-  ];
+  // Buscar campanhas do usuário
+  const fetchCampaigns = async () => {
+    if (!user) return;
+    
+    const { data } = await supabase
+      .from('campanhas')
+      .select('id, nome')
+      .eq('user_id', user.id)
+      .eq('status', 'ativa');
+      
+    setCampaigns(data || []);
+  };
+
+  useEffect(() => {
+    fetchCampaigns();
+  }, [user]);
 
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
@@ -61,24 +54,106 @@ export const SearchContacts = () => {
       return;
     }
 
+    if (!selectedCampaign) {
+      toast({
+        title: "Erro",
+        description: "Selecione uma campanha para associar os contatos",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!user) return;
+
     setIsSearching(true);
     
-    // Simulação de busca no Google Maps
-    setTimeout(() => {
-      setContacts(mockContacts);
-      setIsSearching(false);
+    try {
+      const { data, error } = await supabase.functions.invoke('scrape-google-maps', {
+        body: {
+          keywords: searchTerm,
+          campanhaId: selectedCampaign
+        }
+      });
+
+      if (error) throw error;
+
+      // Buscar os contatos recém-criados
+      const { data: newContacts } = await supabase
+        .from('contatos')
+        .select('*')
+        .eq('campanha_id', selectedCampaign)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      // Mapear os dados do banco para o formato esperado
+      const mappedContacts = (newContacts || []).map(contact => ({
+        id: contact.id,
+        name: contact.nome,
+        address: contact.endereco || '',
+        phone: contact.telefone,
+        website: contact.website,
+        email: contact.email,
+        category: contact.categoria || 'Sem categoria'
+      }));
+
+      setContacts(mappedContacts);
       toast({
         title: "Busca concluída",
-        description: `${mockContacts.length} contatos encontrados`
+        description: `${data.contatos} contatos encontrados e salvos!`
       });
-    }, 3000);
+    } catch (error: any) {
+      console.error('Erro na busca:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao buscar contatos",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSearching(false);
+    }
   };
 
-  const handleExport = () => {
-    toast({
-      title: "Funcionalidade Backend",
-      description: "Para exportar para Google Sheets, conecte ao Supabase para configurar as integrações necessárias."
-    });
+  const handleExport = async () => {
+    if (contacts.length === 0) {
+      toast({
+        title: "Erro",
+        description: "Nenhum contato para exportar",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!selectedCampaign) {
+      toast({
+        title: "Erro", 
+        description: "Selecione uma campanha primeiro",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('google-sheets-sync', {
+        body: {
+          action: 'export',
+          campanhaId: selectedCampaign
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Exportação concluída",
+        description: `${data.contatos} contatos exportados para Google Sheets!`
+      });
+    } catch (error: any) {
+      console.error('Erro na exportação:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao exportar para Google Sheets",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -96,23 +171,40 @@ export const SearchContacts = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Ex: restaurante em São Paulo, loja de roupas Salvador..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1"
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-            />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="md:col-span-2">
+              <Input
+                placeholder="Ex: restaurante em São Paulo, loja de roupas Salvador..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              />
+            </div>
+            <div>
+              <select
+                value={selectedCampaign}
+                onChange={(e) => setSelectedCampaign(e.target.value)}
+                className="w-full p-2 border border-input rounded-md bg-background"
+              >
+                <option value="">Selecione uma campanha</option>
+                {campaigns.map(campaign => (
+                  <option key={campaign.id} value={campaign.id}>
+                    {campaign.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="flex justify-center">
             <Button 
               onClick={handleSearch}
               disabled={isSearching}
               className="bg-gradient-to-r from-primary to-primary-hover"
             >
               {isSearching ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
               ) : (
-                <Search className="w-4 h-4" />
+                <Search className="w-4 h-4 mr-2" />
               )}
               {isSearching ? "Buscando..." : "Buscar"}
             </Button>

@@ -1,7 +1,10 @@
+import { useState, useEffect } from "react";
 import { StatsCard } from "./StatsCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { useAuth } from "@/components/Auth/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   Users, 
   Send, 
@@ -16,59 +19,110 @@ interface DashboardProps {
   onViewChange: (view: string) => void;
 }
 
+interface Campaign {
+  id: string;
+  nome: string;
+  status: string;
+  total_contatos: number;
+  mensagens_enviadas: number;
+  respostas_recebidas: number;
+}
+
 export const Dashboard = ({ onViewChange }: DashboardProps) => {
-  const stats = [
+  const [stats, setStats] = useState({
+    totalContatos: 0,
+    mensagensEnviadas: 0,
+    taxaResposta: "0%",
+    conversoes: 0
+  });
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+
+  const fetchDashboardData = async () => {
+    if (!user) return;
+    
+    try {
+      // Buscar campanhas
+      const { data: campaignsData } = await supabase
+        .from('campanhas')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      setCampaigns(campaignsData || []);
+
+      // Buscar total de contatos
+      const { count: totalContatos } = await supabase
+        .from('contatos')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      // Buscar total de mensagens enviadas
+      const { count: mensagensEnviadas } = await supabase
+        .from('logs_envio')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('status', 'enviado');
+
+      // Calcular taxa de resposta (simulação baseada em logs)
+      const { count: respostas } = await supabase
+        .from('logs_envio')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('status', 'respondido');
+
+      const taxaResposta = mensagensEnviadas && mensagensEnviadas > 0 
+        ? ((respostas || 0) / mensagensEnviadas * 100).toFixed(1) + '%'
+        : '0%';
+
+      setStats({
+        totalContatos: totalContatos || 0,
+        mensagensEnviadas: mensagensEnviadas || 0,
+        taxaResposta,
+        conversoes: Math.floor((respostas || 0) * 0.8) // Simulação de conversões
+      });
+
+    } catch (error) {
+      console.error('Erro ao buscar dados do dashboard:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [user]);
+
+  const statsData = [
     {
       title: "Total de Contatos",
-      value: "2,450",
+      value: loading ? "..." : stats.totalContatos.toString(),
       description: "Contatos coletados",
       icon: Users,
       trend: { value: 12, isPositive: true }
     },
     {
       title: "Mensagens Enviadas",
-      value: "1,823",
-      description: "Este mês",
+      value: loading ? "..." : stats.mensagensEnviadas.toString(),
+      description: "Total enviadas",
       icon: Send,
       trend: { value: 8, isPositive: true }
     },
     {
       title: "Taxa de Resposta",
-      value: "24.8%",
-      description: "Média mensal",
+      value: loading ? "..." : stats.taxaResposta,
+      description: "Média geral",
       icon: MessageCircle,
       trend: { value: 3, isPositive: true }
     },
     {
       title: "Conversões",
-      value: "127",
+      value: loading ? "..." : stats.conversoes.toString(),
       description: "Leads qualificados",
       icon: TrendingUp,
       trend: { value: 15, isPositive: true }
-    }
-  ];
-
-  const activeCampaigns = [
-    {
-      name: "Restaurantes - São Paulo",
-      progress: 65,
-      sent: 324,
-      total: 500,
-      status: "ativa"
-    },
-    {
-      name: "Lojas de Roupas - RJ",
-      progress: 100,
-      sent: 200,
-      total: 200,
-      status: "concluída"
-    },
-    {
-      name: "Academias - Salvador",
-      progress: 25,
-      sent: 50,
-      total: 200,
-      status: "pausada"
     }
   ];
 
@@ -95,7 +149,7 @@ export const Dashboard = ({ onViewChange }: DashboardProps) => {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat, index) => (
+        {statsData.map((stat, index) => (
           <StatsCard
             key={index}
             title={stat.title}
@@ -112,29 +166,41 @@ export const Dashboard = ({ onViewChange }: DashboardProps) => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Play className="w-5 h-5" />
-              Campanhas Ativas
+              Campanhas Recentes
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {activeCampaigns.map((campaign, index) => (
-              <div key={index} className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium">{campaign.name}</span>
-                  <span className={`px-2 py-1 rounded-full text-xs ${
-                    campaign.status === 'ativa' ? 'bg-success/20 text-success' :
-                    campaign.status === 'concluída' ? 'bg-primary/20 text-primary' :
-                    'bg-warning/20 text-warning'
-                  }`}>
-                    {campaign.status}
-                  </span>
-                </div>
-                <Progress value={campaign.progress} className="h-2" />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>{campaign.sent}/{campaign.total} enviadas</span>
-                  <span>{campaign.progress}%</span>
-                </div>
-              </div>
-            ))}
+            {loading ? (
+              <p className="text-muted-foreground text-sm">Carregando campanhas...</p>
+            ) : campaigns.length === 0 ? (
+              <p className="text-muted-foreground text-sm">Nenhuma campanha criada ainda.</p>
+            ) : (
+              campaigns.map((campaign) => {
+                const progress = campaign.total_contatos > 0 
+                  ? (campaign.mensagens_enviadas / campaign.total_contatos * 100)
+                  : 0;
+                
+                return (
+                  <div key={campaign.id} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">{campaign.nome}</span>
+                      <span className={`px-2 py-1 rounded-full text-xs ${
+                        campaign.status === 'ativa' ? 'bg-success/20 text-success' :
+                        campaign.status === 'concluída' ? 'bg-primary/20 text-primary' :
+                        'bg-warning/20 text-warning'
+                      }`}>
+                        {campaign.status}
+                      </span>
+                    </div>
+                    <Progress value={progress} className="h-2" />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>{campaign.mensagens_enviadas}/{campaign.total_contatos} enviadas</span>
+                      <span>{Math.round(progress)}%</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </CardContent>
         </Card>
 

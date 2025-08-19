@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/components/Auth/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   MessageSquare, 
   Plus, 
@@ -26,26 +28,8 @@ interface Template {
 }
 
 export const MessageTemplates = () => {
-  const [templates, setTemplates] = useState<Template[]>([
-    {
-      id: "1",
-      name: "Apresentação Inicial",
-      subject: "Oportunidade de parceria",
-      message: "Olá {nome}! Sou {meu_nome} da {minha_empresa}. Gostaria de apresentar uma oportunidade de parceria que pode beneficiar o {nome_empresa}. Podemos conversar?",
-      type: "whatsapp",
-      variables: ["nome", "meu_nome", "minha_empresa", "nome_empresa"],
-      createdAt: "2024-01-15"
-    },
-    {
-      id: "2",
-      name: "Follow-up Email",
-      subject: "Retomando nossa conversa",
-      message: "Olá {nome}, espero que esteja bem! Retomando nossa conversa sobre {assunto}, gostaria de agendar uma reunião para detalharmos melhor a proposta. Qual seria o melhor horário para você?",
-      type: "email",
-      variables: ["nome", "assunto"],
-      createdAt: "2024-01-14"
-    }
-  ]);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -57,14 +41,55 @@ export const MessageTemplates = () => {
   });
 
   const { toast } = useToast();
+  const { user } = useAuth();
+
+  const fetchTemplates = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('templates_mensagem')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      // Mapear os dados do banco para o formato esperado
+      const mappedTemplates = (data || []).map(template => ({
+        id: template.id,
+        name: template.nome,
+        subject: template.assunto,
+        message: template.conteudo,
+        type: template.tipo as "whatsapp" | "email",
+        variables: template.variaveis || [],
+        createdAt: template.created_at.split('T')[0]
+      }));
+      
+      setTemplates(mappedTemplates);
+    } catch (error: any) {
+      console.error('Erro ao buscar templates:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar templates",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTemplates();
+  }, [user]);
 
   const extractVariables = (text: string): string[] => {
     const matches = text.match(/{([^}]+)}/g);
     return matches ? matches.map(match => match.slice(1, -1)) : [];
   };
 
-  const handleSave = () => {
-    if (!newTemplate.name || !newTemplate.message) {
+  const handleSave = async () => {
+    if (!newTemplate.name || !newTemplate.message || !user) {
       toast({
         title: "Erro",
         description: "Nome e mensagem são obrigatórios",
@@ -74,27 +99,57 @@ export const MessageTemplates = () => {
     }
 
     const variables = extractVariables(newTemplate.message);
-    const template: Template = {
-      id: Date.now().toString(),
-      ...newTemplate,
-      variables,
-      createdAt: new Date().toISOString()
-    };
-
-    if (editingId) {
-      setTemplates(prev => prev.map(t => t.id === editingId ? { ...template, id: editingId } : t));
-      setEditingId(null);
-    } else {
-      setTemplates(prev => [...prev, template]);
-    }
-
-    setNewTemplate({ name: "", subject: "", message: "", type: "whatsapp" });
-    setIsCreating(false);
     
-    toast({
-      title: "Sucesso",
-      description: editingId ? "Template atualizado" : "Template criado"
-    });
+    try {
+      if (editingId) {
+        // Atualizar template existente
+        const { error } = await supabase
+          .from('templates_mensagem')
+          .update({
+            nome: newTemplate.name,
+            assunto: newTemplate.subject,
+            conteudo: newTemplate.message,
+            tipo: newTemplate.type,
+            variaveis: variables
+          })
+          .eq('id', editingId)
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+        setEditingId(null);
+      } else {
+        // Criar novo template
+        const { error } = await supabase
+          .from('templates_mensagem')
+          .insert({
+            nome: newTemplate.name,
+            assunto: newTemplate.subject,
+            conteudo: newTemplate.message,
+            tipo: newTemplate.type,
+            variaveis: variables,
+            user_id: user.id
+          });
+
+        if (error) throw error;
+      }
+
+      setNewTemplate({ name: "", subject: "", message: "", type: "whatsapp" });
+      setIsCreating(false);
+      
+      toast({
+        title: "Sucesso",
+        description: editingId ? "Template atualizado" : "Template criado"
+      });
+      
+      fetchTemplates(); // Recarregar lista
+    } catch (error: any) {
+      console.error('Erro ao salvar template:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar template",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleEdit = (template: Template) => {
@@ -108,12 +163,32 @@ export const MessageTemplates = () => {
     setIsCreating(true);
   };
 
-  const handleDelete = (id: string) => {
-    setTemplates(prev => prev.filter(t => t.id !== id));
-    toast({
-      title: "Template removido",
-      description: "O template foi excluído com sucesso"
-    });
+  const handleDelete = async (id: string) => {
+    if (!user) return;
+    
+    try {
+      const { error } = await supabase
+        .from('templates_mensagem')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      
+      toast({
+        title: "Template removido",
+        description: "O template foi excluído com sucesso"
+      });
+      
+      fetchTemplates(); // Recarregar lista
+    } catch (error: any) {
+      console.error('Erro ao deletar template:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir template",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleCopy = (template: Template) => {
@@ -237,7 +312,18 @@ export const MessageTemplates = () => {
       )}
 
       <div className="grid gap-4">
-        {templates.map((template) => (
+        {loading ? (
+          <p className="text-center text-muted-foreground">Carregando templates...</p>
+        ) : templates.length === 0 ? (
+          <Card className="border-0 bg-gradient-to-br from-card to-muted/30">
+            <CardContent className="text-center py-12">
+              <MessageSquare className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">Nenhum template criado ainda.</p>
+              <p className="text-sm text-muted-foreground mt-2">Clique em "Novo Template" para criar seu primeiro template.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          templates.map((template) => (
           <Card key={template.id} className="border-0 bg-gradient-to-br from-card to-muted/30">
             <CardHeader className="flex flex-row items-center justify-between">
               <div className="flex items-center gap-3">
@@ -291,7 +377,8 @@ export const MessageTemplates = () => {
               )}
             </CardContent>
           </Card>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
