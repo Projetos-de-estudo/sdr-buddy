@@ -83,7 +83,7 @@ export const SearchContacts = () => {
         .select('*')
         .eq('campanha_id', selectedCampaign)
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(50);
 
       // Mapear os dados do banco para o formato esperado
       const mappedContacts = (newContacts || []).map(contact => ({
@@ -97,9 +97,11 @@ export const SearchContacts = () => {
       }));
 
       setContacts(mappedContacts);
+      setContacts(mappedContacts);
+      
       toast({
         title: "Busca concluída",
-        description: `${data.contatos} contatos encontrados e salvos!`
+        description: `${mappedContacts.length} contatos encontrados e salvos!`
       });
     } catch (error: any) {
       console.error('Erro na busca:', error);

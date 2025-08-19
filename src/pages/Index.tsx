@@ -7,6 +7,7 @@ import { MessageTemplates } from "@/components/Templates/MessageTemplates";
 import { CampaignManager } from "@/components/Campaigns/CampaignManager";
 import { SendMessages } from "@/components/Messages/SendMessages";
 import { LoginForm } from "@/components/Auth/LoginForm";
+import { UserSettings } from "@/components/Settings/UserSettings";
 import { useAuth } from "@/components/Auth/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
@@ -49,17 +50,14 @@ const Index = () => {
       case "messages":
         return <SendMessages />;
       case "analytics":
-      case "settings":
         return (
-          <div className="flex items-center justify-center h-96">
-            <div className="text-center space-y-4">
-              <h2 className="text-2xl font-bold">Em Breve</h2>
-              <p className="text-muted-foreground max-w-md">
-                Funcionalidade em desenvolvimento.
-              </p>
-            </div>
+          <div className="p-8 text-center">
+            <h2 className="text-2xl font-semibold mb-4">Em Desenvolvimento</h2>
+            <p className="text-muted-foreground">Esta funcionalidade será disponibilizada em breve.</p>
           </div>
         );
+      case "settings":
+        return <UserSettings />;
       default:
         return <Dashboard onViewChange={handleViewChange} />;
     }
