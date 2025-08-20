@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/Auth/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +16,7 @@ interface UserConfig {
   intervalo_envio: number;
   whatsapp_ativo: boolean;
   email_ativo: boolean;
+  mensagem_padrao: string;
 }
 
 export const UserSettings = () => {
@@ -22,7 +24,8 @@ export const UserSettings = () => {
     google_sheets_id: '',
     intervalo_envio: 30,
     whatsapp_ativo: false,
-    email_ativo: false
+    email_ativo: false,
+    mensagem_padrao: 'Olá! Espero que esteja bem. Gostaria de conversar sobre uma oportunidade que pode ser interessante para seu negócio.'
   });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -45,11 +48,16 @@ export const UserSettings = () => {
       }
 
       if (data) {
+        const configExtras = data.configuracoes_extras as { mensagem_padrao?: string } | null;
+        const mensagemPadrao = configExtras?.mensagem_padrao || 
+          'Olá! Espero que esteja bem. Gostaria de conversar sobre uma oportunidade que pode ser interessante para seu negócio.';
+        
         setConfig({
           google_sheets_id: data.google_sheets_id || '',
           intervalo_envio: data.intervalo_envio || 30,
           whatsapp_ativo: data.whatsapp_ativo || false,
-          email_ativo: data.email_ativo || false
+          email_ativo: data.email_ativo || false,
+          mensagem_padrao: mensagemPadrao
         });
       }
     } catch (error) {
@@ -73,6 +81,10 @@ export const UserSettings = () => {
 
     setSaving(true);
     try {
+      const configuracoes_extras = {
+        mensagem_padrao: config.mensagem_padrao
+      };
+
       const { error } = await supabase
         .from('configuracoes_usuario')
         .upsert({
@@ -81,6 +93,7 @@ export const UserSettings = () => {
           intervalo_envio: config.intervalo_envio,
           whatsapp_ativo: config.whatsapp_ativo,
           email_ativo: config.email_ativo,
+          configuracoes_extras: configuracoes_extras,
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'user_id'
@@ -154,6 +167,20 @@ export const UserSettings = () => {
               />
               <p className="text-xs text-muted-foreground">
                 Tempo de espera entre cada mensagem enviada (mínimo 10 segundos)
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="mensagem">Mensagem Padrão</Label>
+              <Textarea
+                id="mensagem"
+                placeholder="Digite a mensagem padrão para seus contatos..."
+                value={config.mensagem_padrao}
+                onChange={(e) => setConfig(prev => ({ ...prev, mensagem_padrao: e.target.value }))}
+                rows={4}
+              />
+              <p className="text-xs text-muted-foreground">
+                Esta mensagem será usada como base nos seus templates
               </p>
             </div>
 

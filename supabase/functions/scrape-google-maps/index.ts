@@ -64,19 +64,31 @@ serve(async (req) => {
 
     console.log('Starting Google Maps scraping for keywords:', keywords);
 
-    // Simular busca no Google Maps (substitua pela implementação real com Places API)
-    const simulatedResults: BusinessResult[] = await simulateGoogleMapsSearch(keywords);
+// Use the improved database function for generating business data
+    const numResults = Math.floor(Math.random() * 15) + 10; // 10-25 results
+    const { data: simulatedResults, error: dbError } = await supabase
+      .rpc('generate_sample_business_data', {
+        keywords: keywords,
+        num_results: numResults
+      });
+
+    if (dbError) {
+      console.error('Error generating business data:', dbError);
+    }
+
+    // Use the database results or fallback to the original simulation
+    const businessResults = simulatedResults || await simulateGoogleMapsSearch(keywords);
     
     // Salvar contatos no banco de dados
-    const contatosData = simulatedResults.map(result => ({
+    const contatosData = businessResults.map((result: any) => ({
       user_id: user.id,
       campanha_id: campanhaId,
-      nome: result.name,
-      endereco: result.address,
-      telefone: result.phone || null,
+      nome: result.nome || result.name,
+      endereco: result.endereco || result.address,
+      telefone: result.telefone || result.phone || null,
       email: result.email || null,
       website: result.website || null,
-      categoria: result.category || null,
+      categoria: result.categoria || result.category || null,
       status: 'novo'
     }));
 
@@ -93,10 +105,19 @@ serve(async (req) => {
       });
     }
 
-    // Atualizar contador na campanha
+    // Atualizar contador na campanha (somar aos existentes)
+    const { data: currentCampaign } = await supabase
+      .from('campanhas')
+      .select('total_contatos')
+      .eq('id', campanhaId)
+      .eq('user_id', user.id)
+      .single();
+
+    const newTotal = (currentCampaign?.total_contatos || 0) + contatos.length;
+    
     const { error: updateError } = await supabase
       .from('campanhas')
-      .update({ total_contatos: contatos.length })
+      .update({ total_contatos: newTotal })
       .eq('id', campanhaId)
       .eq('user_id', user.id);
 
