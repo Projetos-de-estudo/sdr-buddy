@@ -56,21 +56,6 @@ export type Database = {
         }
         Relationships: []
       }
-      clientes: {
-        Row: {
-          created_at: string
-          id: number
-        }
-        Insert: {
-          created_at?: string
-          id?: number
-        }
-        Update: {
-          created_at?: string
-          id?: number
-        }
-        Relationships: []
-      }
       configuracoes_usuario: {
         Row: {
           configuracoes_extras: Json | null
@@ -271,7 +256,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_sample_business_data: {
+        Args: { keywords: string; num_results: number }
+        Returns: {
+          categoria: string
+          email: string
+          endereco: string
+          nome: string
+          telefone: string
+          website: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
